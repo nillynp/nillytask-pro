@@ -34,8 +34,8 @@ using Microsoft.Win32;
 [assembly: AssemblyProduct("NillyTask Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 
 namespace NillyTaskPro
 {
@@ -545,9 +545,15 @@ namespace NillyTaskPro
         public int LastStartupCount { get { return _startupEntries.Count; } }
         public int LastServicesCount { get { return _serviceRows.Count; } }
 
-        public MainForm(bool smokeMode)
+        private readonly string _initialFilter;
+
+        public MainForm(bool smokeMode) : this(smokeMode, null) { }
+
+        public MainForm(bool smokeMode, string initialFilter)
         {
             _smokeMode = smokeMode;
+            _initialFilter = initialFilter;
+            _dark = ReadSuiteDark(true);
             Text = "NillyTask Pro — Nilly graphics";
             Size = new Size(1060, 680);
             MinimumSize = new Size(780, 500);
@@ -579,12 +585,29 @@ namespace NillyTaskPro
 
             Shown += delegate
             {
+                if (!string.IsNullOrEmpty(_initialFilter)) _txtSearch.Text = _initialFilter;
                 RefreshProcesses();
                 LoadStartupItems();
                 LoadServices();
                 Native.TrimMemory();
                 if (!_smokeMode) _refreshTimer.Start();
             };
+        }
+
+        private static bool ReadSuiteDark(bool fallback)
+        {
+            try
+            {
+                string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"NillySuite\suite.theme");
+                if (File.Exists(p))
+                {
+                    string s = File.ReadAllText(p, Encoding.ASCII).Trim();
+                    if (s.Equals("light", StringComparison.OrdinalIgnoreCase)) return false;
+                    if (s.Equals("dark", StringComparison.OrdinalIgnoreCase)) return true;
+                }
+            }
+            catch { }
+            return fallback;
         }
 
         private void PrimeCpuCounters()
@@ -798,7 +821,9 @@ namespace NillyTaskPro
             {
                 cm.Items.Add("🌐 Δες Συνδέσεις Δικτύου (NillyNet Pro)", null, delegate
                 {
-                    try { Process.Start(new ProcessStartInfo(netExe) { WorkingDirectory = Path.GetDirectoryName(netExe), UseShellExecute = true }); } catch { }
+                    ProcInfo p = GetSelectedProc();
+                    string arg = (p != null && !string.IsNullOrEmpty(p.Name)) ? ("--filter \"" + p.Name.Replace("\"", "") + "\"") : "";
+                    try { Process.Start(new ProcessStartInfo(netExe, arg) { WorkingDirectory = Path.GetDirectoryName(netExe), UseShellExecute = true }); } catch { }
                 });
             }
             cm.Items.Add("Άνοιγμα Φακέλου (Windows Explorer)", null, delegate { OpenSelectedLocation(); });
@@ -1480,10 +1505,20 @@ namespace NillyTaskPro
             if (args != null && args.Length > 0 && args[0].Equals("--test-smoke", StringComparison.OrdinalIgnoreCase))
                 return RunSmokeTest(args.Length > 1 ? args[1] : null, args.Length > 2 ? args[2] : null);
 
+            string initFilter = null;
+            if (args != null)
+            {
+                for (int i = 0; i < args.Length; i++)
+                {
+                    if ((args[i].Equals("--filter", StringComparison.OrdinalIgnoreCase) || args[i].Equals("--pid", StringComparison.OrdinalIgnoreCase)) && i + 1 < args.Length)
+                    { initFilter = args[i + 1]; break; }
+                }
+            }
+
             bool createdNew;
             using (Mutex m = new Mutex(true, "Local\\NillyTaskPro_SingleInstance_v1", out createdNew))
             {
-                Application.Run(new MainForm(false));
+                Application.Run(new MainForm(false, initFilter));
             }
             return 0;
         }
