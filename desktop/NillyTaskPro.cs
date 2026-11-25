@@ -34,8 +34,8 @@ using Microsoft.Win32;
 [assembly: AssemblyProduct("NillyTask Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace NillyTaskPro
 {
@@ -63,7 +63,51 @@ namespace NillyTaskPro
             public ulong ToUInt64() { return ((ulong)dwHighDateTime << 32) | dwLowDateTime; }
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct SYSTEM_POWER_STATUS
+        {
+            public byte ACLineStatus;
+            public byte BatteryFlag;
+            public byte BatteryLifePercent;
+            public byte SystemStatusFlag;
+            public int BatteryLifeTime;
+            public int BatteryFullLifeTime;
+        }
+
         [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+        [DllImport("kernel32.dll")] private static extern IntPtr GetCurrentProcess();
+        [DllImport("kernel32.dll")] private static extern bool SetProcessWorkingSetSize(IntPtr hProcess, IntPtr minSize, IntPtr maxSize);
+        [DllImport("kernel32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetSystemPowerStatus(out SYSTEM_POWER_STATUS lpSystemPowerStatus);
+
+        public static void TrimMemory()
+        {
+            try
+            {
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
+                SetProcessWorkingSetSize(GetCurrentProcess(), (IntPtr)(-1), (IntPtr)(-1));
+            }
+            catch { }
+        }
+
+        public static string GetBatterySummary()
+        {
+            try
+            {
+                SYSTEM_POWER_STATUS ps;
+                if (!GetSystemPowerStatus(out ps)) return "";
+                if (ps.BatteryFlag == 128 || ps.BatteryLifePercent == 255) return ""; // Desktop / No battery
+                string state = (ps.ACLineStatus == 1) ? "AC/Φόρτιση" : "Μπαταρία";
+                if (ps.ACLineStatus == 0 && ps.BatteryLifeTime > 60)
+                {
+                    int hrs = ps.BatteryLifeTime / 3600;
+                    int mins = (ps.BatteryLifeTime % 3600) / 60;
+                    state = string.Format("~{0}ω {1}λ", hrs, mins);
+                }
+                return string.Format(" · Μπατ.: {0}% ({1})", ps.BatteryLifePercent, state);
+            }
+            catch { return ""; }
+        }
         [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int val, int sz);
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -538,6 +582,7 @@ namespace NillyTaskPro
                 RefreshProcesses();
                 LoadStartupItems();
                 LoadServices();
+                Native.TrimMemory();
                 if (!_smokeMode) _refreshTimer.Start();
             };
         }
@@ -930,14 +975,15 @@ namespace NillyTaskPro
             double ramPct = mem.dwMemoryLoad;
 
             TimeSpan up = TimeSpan.FromMilliseconds(Native.GetTickCount64());
-            string upStr = string.Format("{0}η {1}ω {2}λ", up.Days, up.Hours, up.Minutes);
+            string batStr = Native.GetBatterySummary();
+            string upStr = string.Format("{0}η {1}ω {2}λ{3}", up.Days, up.Hours, up.Minutes, batStr);
 
             ProcInfo heaviest = null;
             for (int i = 0; i < list.Count; i++)
                 if (heaviest == null || list[i].RamMb > heaviest.RamMb) heaviest = list[i];
 
             _lblHudCpu.Text = string.Format("CPU: {0:0.0}%  ·  {1} διεργασίες", sysCpuPct, list.Count);
-            _lblHudRam.Text = string.Format("RAM: {0:0.0}%  ({1:0.0} / {2:0.0} GB)", ramPct, usedGb, totalGb);
+            _lblHudRam.Text = string.Format("RAM: {0:0.0}%  ({1:0.0} / {2:0.0} GB){3}", ramPct, usedGb, totalGb, batStr);
             _lblHudTop.Text = heaviest != null
                 ? string.Format("Πιο βαρύ τώρα: {0} ({1:0.0} MB)", heaviest.Name, heaviest.RamMb)
                 : "";
