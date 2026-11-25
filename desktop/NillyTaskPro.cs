@@ -34,8 +34,8 @@ using Microsoft.Win32;
 [assembly: AssemblyProduct("NillyTask Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 namespace NillyTaskPro
 {
@@ -751,6 +751,23 @@ namespace NillyTaskPro
             SizeChanged += delegate { FitActiveColumns(); };
         }
 
+        private static string FindSiblingExe(string folder, string exeName)
+        {
+            try
+            {
+                string appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"NillySuite\" + folder + @"\" + exeName);
+                if (File.Exists(appData)) return appData;
+                DirectoryInfo par = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\'));
+                if (par != null)
+                {
+                    string sib = Path.Combine(Path.Combine(par.FullName, folder), exeName);
+                    if (File.Exists(sib)) return sib;
+                }
+            }
+            catch { }
+            return null;
+        }
+
         private ContextMenuStrip BuildProcContextMenu()
         {
             ContextMenuStrip cm = new ContextMenuStrip();
@@ -766,7 +783,25 @@ namespace NillyTaskPro
             pri.DropDownItems.Add("Υψηλή (High)", null, delegate { SetSelectedPriority(ProcessPriorityClass.High); });
             cm.Items.Add(pri);
             cm.Items.Add(new ToolStripSeparator());
-            cm.Items.Add("Άνοιγμα Φακέλου Αρχείου", null, delegate { OpenSelectedLocation(); });
+            string filesExe = FindSiblingExe("NillyFilesPro", "NillyFilesPro.exe");
+            if (filesExe != null)
+            {
+                cm.Items.Add("📂 Άνοιγμα Φακέλου σε NillyFiles Pro", null, delegate
+                {
+                    ProcInfo p = GetSelectedProc();
+                    if (p != null && !string.IsNullOrEmpty(p.Path) && File.Exists(p.Path))
+                        try { Process.Start(new ProcessStartInfo(filesExe, "\"" + Path.GetDirectoryName(p.Path) + "\"") { WorkingDirectory = Path.GetDirectoryName(filesExe), UseShellExecute = true }); } catch { }
+                });
+            }
+            string netExe = FindSiblingExe("NillyNetPro", "NillyNetPro.exe");
+            if (netExe != null)
+            {
+                cm.Items.Add("🌐 Δες Συνδέσεις Δικτύου (NillyNet Pro)", null, delegate
+                {
+                    try { Process.Start(new ProcessStartInfo(netExe) { WorkingDirectory = Path.GetDirectoryName(netExe), UseShellExecute = true }); } catch { }
+                });
+            }
+            cm.Items.Add("Άνοιγμα Φακέλου (Windows Explorer)", null, delegate { OpenSelectedLocation(); });
             cm.Items.Add("Αντιγραφή Διαδρομής", null, delegate
             {
                 ProcInfo p = GetSelectedProc();
