@@ -34,8 +34,8 @@ using Microsoft.Win32;
 [assembly: AssemblyProduct("NillyTask Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.3.1.0")]
-[assembly: AssemblyFileVersion("1.3.1.0")]
+[assembly: AssemblyVersion("1.3.2.0")]
+[assembly: AssemblyFileVersion("1.3.2.0")]
 
 namespace NillyTaskPro
 {
@@ -634,7 +634,7 @@ namespace NillyTaskPro
             _btnTheme = MkBtn("◐", 30, delegate { _dark = !_dark; ApplyTheme(); });
             _btnTop = MkBtn("Pin", 42, delegate { TopMost = !TopMost; StyleTopButtons(); });
             _btnPause = MkBtn("||", 32, delegate { TogglePause(); });
-            _btnRamRescue = MkBtn("⚡ Ανάσα RAM", 116, delegate { RunRamRescue(); });
+            _btnRamRescue = MkBtn("Ανάσα RAM", 104, delegate { RunRamRescue(); });
             _txtSearch = new TextBox { Width = 144, Height = 26, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 9f), Margin = new Padding(4, 2, 4, 0) };
             _txtSearch.TextChanged += delegate { FilterCurrentView(); };
 
@@ -687,7 +687,7 @@ namespace NillyTaskPro
             FlowLayoutPanel actLeft = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 680, WrapContents = false };
             _btnKill = MkBtn("✕ Τερματισμός", 118, delegate { KillSelectedProcess(false); });
             _btnKillTree = MkBtn("✕✕ Δέντρο", 98, delegate { KillSelectedProcess(true); });
-            _btnTrimOne = MkBtn("⚡ Trim RAM", 96, delegate { TrimSelectedProcess(); });
+            _btnTrimOne = MkBtn("Trim RAM", 86, delegate { TrimSelectedProcess(); });
             _btnOpenLoc = MkBtn("Φάκελος", 80, delegate { OpenSelectedLocation(); });
             _btnRestartExp = MkBtn("↻ Επανεκκίνηση Explorer", 168, delegate { RestartExplorerSafe(); });
             actLeft.Controls.AddRange(new Control[] { _btnKill, _btnKillTree, _btnTrimOne, _btnOpenLoc, _btnRestartExp });
@@ -735,7 +735,7 @@ namespace NillyTaskPro
             // --- Page 3: Services + Old-Laptop Rescue Strip ---
             _svcPage = new Panel { Dock = DockStyle.Fill };
             _rescueStrip = new Panel { Dock = DockStyle.Top, Height = 58, Padding = new Padding(14, 8, 14, 8) };
-            Label lRes = new Label { Left = 14, Top = 6, Width = 520, Height = 16, Font = new Font("Segoe UI", 8.2f, FontStyle.Bold), UseMnemonic = false, Text = "⚡ Γρήγορη Ανάσα Παλιού Laptop (Zero Admin · HKCU · 100% Αναστρέψιμο):" };
+            Label lRes = new Label { Left = 14, Top = 6, Width = 520, Height = 16, Font = new Font("Segoe UI", 8.2f, FontStyle.Bold), UseMnemonic = false, Text = "Γρήγορη Ανάσα Παλιού Laptop (Zero Admin · HKCU · 100% Αναστρέψιμο):" };
             _btnResAnim = MkBtn("Animations & Blur OFF", 164, delegate { ApplyLaptopTweak("anim"); });
             _btnResAnim.Left = 14; _btnResAnim.Top = 26;
             _btnResBg = MkBtn("Background Store Apps OFF", 184, delegate { ApplyLaptopTweak("bgapps"); });
@@ -797,7 +797,7 @@ namespace NillyTaskPro
             cm.Items.Add("✕ Τερματισμός Διεργασίας (Del)", null, delegate { KillSelectedProcess(false); });
             cm.Items.Add("✕✕ Τερματισμός Δέντρου (Kill Tree)", null, delegate { KillSelectedProcess(true); });
             cm.Items.Add(new ToolStripSeparator());
-            cm.Items.Add("⚡ Ελευθέρωση RAM (Trim Working Set)", null, delegate { TrimSelectedProcess(); });
+            cm.Items.Add("Ελευθέρωση RAM (Trim Working Set)", null, delegate { TrimSelectedProcess(); });
             ToolStripMenuItem pri = new ToolStripMenuItem("Προτεραιότητα CPU");
             pri.DropDownItems.Add("Χαμηλή (Idle)", null, delegate { SetSelectedPriority(ProcessPriorityClass.Idle); });
             pri.DropDownItems.Add("Κάτω από Κανονική", null, delegate { SetSelectedPriority(ProcessPriorityClass.BelowNormal); });
@@ -809,7 +809,7 @@ namespace NillyTaskPro
             string filesExe = FindSiblingExe("NillyFilesPro", "NillyFilesPro.exe");
             if (filesExe != null)
             {
-                cm.Items.Add("📂 Άνοιγμα Φακέλου σε NillyFiles Pro", null, delegate
+                cm.Items.Add("Άνοιγμα Φακέλου σε NillyFiles Pro", null, delegate
                 {
                     ProcInfo p = GetSelectedProc();
                     if (p != null && !string.IsNullOrEmpty(p.Path) && File.Exists(p.Path))
@@ -819,7 +819,7 @@ namespace NillyTaskPro
             string netExe = FindSiblingExe("NillyNetPro", "NillyNetPro.exe");
             if (netExe != null)
             {
-                cm.Items.Add("🌐 Δες Συνδέσεις Δικτύου (NillyNet Pro)", null, delegate
+                cm.Items.Add("Δες Συνδέσεις Δικτύου (NillyNet Pro)", null, delegate
                 {
                     ProcInfo p = GetSelectedProc();
                     string arg = (p != null && !string.IsNullOrEmpty(p.Name)) ? ("--filter \"" + p.Name.Replace("\"", "") + "\"") : "";
