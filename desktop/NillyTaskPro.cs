@@ -34,8 +34,8 @@ using Microsoft.Win32;
 [assembly: AssemblyProduct("NillyTask Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.3.2.0")]
-[assembly: AssemblyFileVersion("1.3.2.0")]
+[assembly: AssemblyVersion("1.3.3.0")]
+[assembly: AssemblyFileVersion("1.3.3.0")]
 
 namespace NillyTaskPro
 {
@@ -119,6 +119,54 @@ namespace NillyTaskPro
         [DllImport("psapi.dll")] public static extern bool EmptyWorkingSet(IntPtr hProcess);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
+
+        private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, int dwProcessId);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CloseHandle(IntPtr hObject);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetProcessTimes(IntPtr hProcess, out FILETIME creation, out FILETIME exit, out FILETIME kernel, out FILETIME user);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool QueryFullProcessImageName(IntPtr hProcess, int dwFlags, StringBuilder lpExeName, ref int lpdwSize);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint GetPriorityClass(IntPtr hProcess);
+
+        public static void QueryProcessFast(int pid, bool needPath, out long cpuTicks, out bool hasCpu, out string priority, out string path)
+        {
+            cpuTicks = 0; hasCpu = false; priority = "System"; path = "";
+            if (pid <= 4) return;
+            IntPtr h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            if (h == IntPtr.Zero) return;
+            try
+            {
+                FILETIME cr, ex, krn, usr;
+                if (GetProcessTimes(h, out cr, out ex, out krn, out usr))
+                {
+                    cpuTicks = (long)(krn.ToUInt64() + usr.ToUInt64());
+                    hasCpu = true;
+                }
+                uint pc = GetPriorityClass(h);
+                if (pc == 0x20) priority = "Normal";
+                else if (pc == 0x40) priority = "Idle";
+                else if (pc == 0x80) priority = "High";
+                else if (pc == 0x100) priority = "RealTime";
+                else if (pc == 0x4000) priority = "BelowNormal";
+                else if (pc == 0x8000) priority = "AboveNormal";
+
+                if (needPath)
+                {
+                    StringBuilder sb = new StringBuilder(520);
+                    int sz = sb.Capacity;
+                    if (QueryFullProcessImageName(h, 0, sb, ref sz) && sz > 0)
+                        path = sb.ToString(0, sz);
+                }
+            }
+            finally { CloseHandle(h); }
+        }
 
         public static void SetDarkTitlebar(IntPtr hwnd, bool dark)
         {
@@ -523,6 +571,9 @@ namespace NillyTaskPro
         private ulong _prevIdle, _prevKernel, _prevUser;
         private long _prevWallTicks;
         private readonly Dictionary<int, long> _prevProcTicks = new Dictionary<int, long>();
+        private readonly Dictionary<int, string> _pidPathCache = new Dictionary<int, string>();
+        private readonly Dictionary<int, string> _pidNameCache = new Dictionary<int, string>();
+        private bool _wasMinimized = false;
         private List<ProcInfo> _lastProcs = new List<ProcInfo>();
         private List<StartupEntry> _startupEntries = new List<StartupEntry>();
         private List<ServiceRow> _serviceRows = new List<ServiceRow>();
@@ -581,7 +632,13 @@ namespace NillyTaskPro
 
             _refreshTimer = new System.Windows.Forms.Timer();
             _refreshTimer.Interval = 1500;
-            _refreshTimer.Tick += delegate { if (!_paused) RefreshProcesses(); };
+            _refreshTimer.Tick += delegate { if (!_paused && WindowState != FormWindowState.Minimized) RefreshProcesses(); };
+
+            Resize += delegate
+            {
+                if (WindowState == FormWindowState.Minimized) _wasMinimized = true;
+                else if (_wasMinimized) { _wasMinimized = false; if (!_paused) RefreshProcesses(); }
+            };
 
             Shown += delegate
             {
@@ -987,6 +1044,8 @@ namespace NillyTaskPro
             int cores = Math.Max(1, Environment.ProcessorCount);
 
             Dictionary<int, long> nextProcTicks = new Dictionary<int, long>(256);
+            Dictionary<int, string> nextPaths = new Dictionary<int, string>(256);
+            Dictionary<int, string> nextNames = new Dictionary<int, string>(256);
             List<ProcInfo> list = new List<ProcInfo>(256);
             int totalThreads = 0;
             Process[] raw = Process.GetProcesses();
@@ -1006,18 +1065,24 @@ namespace NillyTaskPro
                     pi.IsCritical = HardProtectedProcs.Contains(pi.Name);
                     pi.IsNilly = pi.Name.StartsWith("Nilly", StringComparison.OrdinalIgnoreCase);
 
-                    try
+                    string cachedName, cachedPath = "";
+                    bool hasCachedPath = _pidNameCache.TryGetValue(pi.Pid, out cachedName)
+                        && string.Equals(cachedName, pi.Name, StringComparison.OrdinalIgnoreCase)
+                        && _pidPathCache.TryGetValue(pi.Pid, out cachedPath);
+
+                    long pt; bool hasCpu; string prio, queriedPath;
+                    Native.QueryProcessFast(pi.Pid, !hasCachedPath, out pt, out hasCpu, out prio, out queriedPath);
+                    if (hasCpu)
                     {
-                        long pt = p.TotalProcessorTime.Ticks;
-                        nextProcTicks[p.Id] = pt;
+                        nextProcTicks[pi.Pid] = pt;
                         long prevPt;
-                        if (_prevProcTicks.TryGetValue(p.Id, out prevPt) && pt >= prevPt)
+                        if (_prevProcTicks.TryGetValue(pi.Pid, out prevPt) && pt >= prevPt)
                             pi.CpuPct = Math.Min(100.0, ((pt - prevPt) * 100.0) / (wallDelta * cores));
                     }
-                    catch { }
-
-                    try { pi.Priority = p.PriorityClass.ToString(); } catch { pi.Priority = "System"; }
-                    try { pi.Path = p.MainModule.FileName; } catch { pi.Path = ""; }
+                    pi.Priority = prio;
+                    pi.Path = hasCachedPath ? cachedPath : queriedPath;
+                    nextNames[pi.Pid] = pi.Name;
+                    nextPaths[pi.Pid] = pi.Path;
                     list.Add(pi);
                 }
                 catch { }
@@ -1026,6 +1091,10 @@ namespace NillyTaskPro
 
             _prevProcTicks.Clear();
             foreach (KeyValuePair<int, long> kv in nextProcTicks) _prevProcTicks[kv.Key] = kv.Value;
+            _pidNameCache.Clear();
+            foreach (KeyValuePair<int, string> kv in nextNames) _pidNameCache[kv.Key] = kv.Value;
+            _pidPathCache.Clear();
+            foreach (KeyValuePair<int, string> kv in nextPaths) _pidPathCache[kv.Key] = kv.Value;
             _lastProcs = list;
 
             Native.MEMORYSTATUSEX mem = Native.GetMemory();
