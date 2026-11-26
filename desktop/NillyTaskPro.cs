@@ -34,8 +34,8 @@ using Microsoft.Win32;
 [assembly: AssemblyProduct("NillyTask Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.3.0.0")]
-[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.3.1.0")]
+[assembly: AssemblyFileVersion("1.3.1.0")]
 
 namespace NillyTaskPro
 {
@@ -631,7 +631,7 @@ namespace NillyTaskPro
             Label lblTag = new Label { Left = 196, Top = 14, Width = 240, Height = 18, Font = new Font("Segoe UI", 8.2f), Text = "Ultra-Light Native Task Manager", UseMnemonic = false, Tag = "muted" };
 
             FlowLayoutPanel rBar = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 380, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(0, 2, 0, 0) };
-            _btnTheme = MkBtn("☀", 30, delegate { _dark = !_dark; ApplyTheme(); });
+            _btnTheme = MkBtn("◐", 30, delegate { _dark = !_dark; ApplyTheme(); });
             _btnTop = MkBtn("Pin", 42, delegate { TopMost = !TopMost; StyleTopButtons(); });
             _btnPause = MkBtn("||", 32, delegate { TogglePause(); });
             _btnRamRescue = MkBtn("⚡ Ανάσα RAM", 116, delegate { RunRamRescue(); });
@@ -918,7 +918,7 @@ namespace NillyTaskPro
             _lblHudTop.ForeColor = orange;
             _lblStatus.ForeColor = muted;
             _lblCredit.ForeColor = orange;
-            _btnTheme.Text = _dark ? "☀" : "🌙";
+            _btnTheme.Text = "◐";
 
             Button[] stdBtns = new Button[] { _btnPause, _btnTheme, _btnTrimOne, _btnOpenLoc, _btnRestartExp, _btnStartupToggle, _btnStartupRefresh, _btnSvcStart, _btnSvcStop, _btnSvcRefresh, _btnResAnim, _btnResBg, _btnResWid, _btnResRestore };
             for (int i = 0; i < stdBtns.Length; i++)
